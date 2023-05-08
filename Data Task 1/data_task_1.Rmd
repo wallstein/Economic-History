@@ -1,0 +1,17 @@
+---
+title: "Data Task 1"
+author: "Jonas Wallstein"
+date: "2023-05-08"
+output: pdf_document
+---
+### 0. Setup
+```{r}
+rm(list = ls())
+library(tidyverse)
+library(stargazer)
+library(fixest)
+
+stu_ger <- read_csv("/cieh_2023_datatask1_data/students_germany.csv")
+
+```
+
