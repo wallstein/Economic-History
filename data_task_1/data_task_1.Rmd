@@ -1,0 +1,194 @@
+---
+title: "Culture and Institutions: Data Task 1"
+author: "Jonas Wallstein & Caroline Belka"
+date: "2023-05-11"
+output: pdf_document
+---
+## 0. Setup
+
+```{r setup, include=FALSE}
+# Set maximum width for output
+options(width = 80)
+```
+
+
+```{r, results='hide', message = FALSE}
+rm(list = ls())
+library(tidyverse)
+library(stargazer)
+library(ggplot2)
+library(estimatr)
+
+stu_ger <- read_csv("./cieh_2023_datatask1_data/students_germany.csv")
+analysis_ger <- read_csv("./cieh_2023_datatask1_data/analysis_germany.csv")
+analysis_eng_wales <- read_csv("./cieh_2023_datatask1_data/analysis_england_wales.csv")
+analysis_italy <- read_csv("./cieh_2023_datatask1_data/analysis_italy.csv")
+
+```
+
+
+## 1. Figure IV
+```{r}
+theme_set(theme_bw())
+ggplot(stu_ger, aes(x=year)) +
+  geom_line(aes(y=germany, colour="Germany")) + 
+  geom_line(aes(y=foreign, colour="Foreign")) +
+  scale_color_manual(name = "Country", values = c("Germany" = "#00AFBB", 
+                                                  "Foreign" = "#FC4E07")) +
+  scale_x_continuous(name="Year", breaks=seq(1366, 1406, by=10)) +
+  scale_y_continuous(name = "Number of students enrolled", limits = c(0,800)) +
+  ggtitle("German students enrolled at universities, 1366-1406") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+
+
+## 2. Panel
+```{r}
+# Write function to aggregate over years
+# Create "newmarkets": total number of newly established markets 
+# in Germany per 1000 cities in the given year
+aggregate_by_year = function(input_df, output_df, number_cities, delete1386){
+  df <- input_df %>%
+     group_by(year) %>% 
+     summarise(newmarkets = sum(markets) * 1000 / number_cities) 
+  df$post1386 = ifelse(df$year >1386, 1, 0) # create post1368 dummy
+  ifelse(delete1386 == TRUE, df <- filter(df, year != 1386), "") # option to delete 1386
+  df <- mutate(df, year = year - 1386) # centering the year around 1386 as in the paper
+  assign(output_df, df, envir = .GlobalEnv)
+  head(df, 5)
+}
+
+aggregate_by_year(input_df = analysis_ger, output_df = "by_year_ger", 
+                  number_cities = 2256, delete1386 = F)
+```
+
+## 3. Regression
+#### 3a)
+```{r}
+by_year_pre1386 <- filter(by_year_ger, year < 0)
+  
+rlm1 <- lm_robust(newmarkets ~ year, by_year_pre1386)
+summary(rlm1)
+```
+#### 3b)
+An additional year (before 1386) goes along with 0.06 fewer newly established markets per 1000 cities. The effect is negative and not significant.
+
+#### 3c)
+```{r}
+predictions <- filter(by_year_ger, year == 0)
+  
+predictions$rlm1_prediction <- predict(rlm1, predictions)
+print(predictions)
+```
+The predicted value for 1386 is 1.22 new markets, according to the regression model considering the years before 1386.
+
+#### 3d)
+```{r}
+by_year_post1386 <- filter(by_year_ger, year > 0)
+  
+rlm2 <- lm_robust(newmarkets ~ year, by_year_post1386)
+summary(rlm2)
+```
+
+#### 3e)
+An additional year (after 1385) goes along with 0.09 more newly established markets per 1000 cities. The effect is positive and but insignificant. The declining trend in new markets seems to turn towards an increasing trend after 1386.
+
+#### 3f)
+
+```{r}
+predictions$rlm2_prediction <- predict(rlm2, predictions)
+print(predictions)
+```
+
+The predicted value for 1386 is 1.31 new markets, according to the regression model considering the years after 1386.
+
+#### 3g)
+```{r}
+coef(rlm1)[2] - coef(rlm2)[2]
+```
+
+The difference between the $\hat\beta_{1}$ from a) and d) is 0.15
+
+#### 3h) 
+```{r}
+predictions$delta = predictions$rlm2_prediction - predictions$rlm1_prediction
+print(predictions)
+```
+
+
+The predictions from the two regression models differ by 0.08. The actual number of newly established markets in 1386 is zero.
+
+
+## 4. Interaction year $\times$ post
+```{r}
+by_year_ger <- filter(by_year_ger, year != 0) 
+
+f = newmarkets ~ year * post1386
+
+rlm3 <- lm_robust(formula = f, by_year_ger)
+summary(rlm3)
+``` 
+
+- The estimate for $\hat\beta_{1}$ is -0.061 meaning that with every additional year, the number of newly established markets decreases on average by 0.06 ceteris paribus. The effect is however not significant.
+- The estimate for $\hat\beta_{2}$ is 0.084 meaning that the number of expected markets jumps after 1386 by 0.084. The effect is not significant at the 5% level.
+- The estimate for $\hat\beta_{3}$ is 0.151 meaning that after 1386 the effect of an additional year on newly established markets is 0.09 (0.151 - 0.061). The effect is significant at the 5% level. 
+
+
+## 5. Sample split
+```{r}
+# Calculate Median 
+median_distdiff = median(analysis_ger$distdiff)
+
+# Subsample where distdiff > median -> 2256/2 = 1128 cities remain
+by_year_above = filter(analysis_ger, distdiff >= median_distdiff)
+aggregate_by_year(input_df = by_year_above, output_df = "by_year_above", 
+                  number_cities = 1128, TRUE)
+# Regression on subsample where distdiff > median
+rlm4 <- lm_robust(formula = f, by_year_above)
+summary(rlm4)
+
+# Subsample where distdiff < median -> 2256/2 = 1128 cities remain
+by_year_below = filter(analysis_ger, distdiff < median_distdiff)
+aggregate_by_year(input_df = by_year_below, output_df = "by_year_below", 
+                  number_cities = 1128, TRUE)
+# Regression on subsample where distdiff < median
+rlm5 <- lm_robust(formula = f, by_year_below)
+summary(rlm5)
+
+```
+
+## 6. Placebo Analysis
+### Italy
+```{r}
+aggregate_by_year(analysis_italy, "by_year_italy", 190, T)
+
+rlm6 <- lm_robust(formula = f, by_year_italy)
+summary(rlm6)
+```
+### England & Wales 
+```{r}
+aggregate_by_year(analysis_eng_wales, "by_year_eng", 2254, T)
+
+rlm7 <- lm_robust(formula = f, by_year_eng)
+summary(rlm7)
+```
+
+## 7. Regression Table
+```{r, results='asis'}
+# Stargazer does not work with lm_robust 
+# Robust standard errors manually added with starprep argument
+lm3 <- lm(formula = f, by_year_ger)
+lm4 <- lm(formula = f, by_year_below)
+lm5 <- lm(formula = f, by_year_above)
+lm6 <- lm(formula = f, by_year_italy)
+lm7 <- lm(formula = f, by_year_eng)
+
+stargazer(lm3, lm4, lm5, lm6, lm7, se = starprep(lm3, lm4, lm5, lm6, lm7), 
+          dep.var.labels = "New markets",
+          column.labels = c("Base", "< Median",">= Median", "Italy", "England and Wales"))
+```
+
+
+
+
