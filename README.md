@@ -1,6 +1,6 @@
 # Data Task 1
 ## Exercise
-The exercise for Data Task 1 involves replicating research results on Medieval Universities using datasets. Key tasks include reproducing figures and regression results from Cantoni and Yuchtman (2014), performing time series and using a Regression Discontinuity Design. The focus is on analyzing historical data on German universities and their impacts on market establishment.
+The exercise for Data Task 1 involves replicating research results on Medieval Universities using datasets. Key tasks include reproducing figures and regression results from [Cantoni and Yuchtman (2014)](https://bit.ly/46f108q), performing time series and using a Regression Discontinuity Design. The focus is on analyzing historical data on German universities and their impacts on market establishment.
 
 ## Findings
 
