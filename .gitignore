@@ -52,4 +52,4 @@ Paper/
 cieh_2023_datatask1_solutions/
 
 *.html
-*.DS_Store
+.DS_Store
