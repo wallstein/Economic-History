@@ -38,7 +38,7 @@ ggplot(stu_ger, aes(x=year)) +
   scale_x_continuous(name="Year", breaks=seq(1366, 1406, by=10)) +
   scale_y_continuous(name = "Number of students enrolled", limits = c(0,800)) +
   ggtitle("German students enrolled at universities, 1366-1406") +
-  theme(plot.title = element_text(hjust = 0.5))
+  theme(plot.title = element_text(hjust = 0.5), legend.title = element_blank(), legend.position = "bottom")
 ```
 
 

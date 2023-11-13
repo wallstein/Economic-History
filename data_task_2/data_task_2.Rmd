@@ -1,0 +1,154 @@
+---
+title: "Culture and Institutions: Data Task 2"
+author: "Caroline Belka, Carmen Cano, Jonas Wallstein"
+date: "2023-06-04"
+output: pdf_document
+
+
+---
+
+
+```{r, results='hide', message = FALSE}
+rm(list = ls())
+#load packages 
+library(tidyverse)
+library(ggplot2)
+library(scales)
+library(modelsummary)
+library(fixest)
+library(estimatr)
+
+
+wage_panel <- read_delim("./data_task2.csv")
+```
+
+## 1
+### 1a
+```{r}
+wage_panel_1911 <- filter(wage_panel, year == 1911 & salary < 10000)
+
+# With absolute count as y axis
+gg1 <-  ggplot(wage_panel_1911, aes(x=salary, fill = factor(black))) + 
+  geom_histogram(binwidth = 100) + 
+  scale_fill_discrete(name = "Group", labels = c("White", "Black")) 
+plot(gg1)
+
+# Alternatively density relative to the own group
+gg2 <- ggplot(wage_panel_1911, aes(x = salary, fill = factor(black))) +
+  geom_density(alpha = 0.5) +
+  scale_fill_discrete(name = "Group", labels = c("White", "Black")) +
+  ylab("Density")
+plot(gg2)
+
+```
+
+
+### 1b
+```{r}
+wage_panel_1921 <- filter(wage_panel, year == 1921 & salary < 10000)
+
+# With absolute count as y axis
+gg3 <-  ggplot(wage_panel_1921, aes(x=salary, fill = factor(black))) + 
+  geom_histogram(binwidth = 100) + 
+  scale_fill_discrete(name = "Group", labels = c("White", "Black")) 
+plot(gg3)
+
+# Alternatively density relative to the own group
+gg4 <- ggplot(wage_panel_1921, aes(x = salary, fill = factor(black))) +
+  geom_density(alpha = 0.5) +
+  scale_fill_discrete(name = "Group", labels = c("White", "Black")) +
+  ylab("Density")
+plot(gg4)
+
+```
+
+### 1c
+
+In 1911, the distribution seems equal between black and white workers. In 1921, although all workers have a higher income on average, white workers reached a higher salary level relative to black workers. 
+
+## 2
+```{r}
+sum1 <- datasummary_balance( ~ black, wage_panel_1911)
+sum1
+```
+
+None of the variables seem to have significant differences.
+
+
+## 3
+```{r}
+wage_panel$post = ifelse(wage_panel$year >= 1913, 1, 0)
+
+ln_salary = aggregate(x = wage_panel$ln_salary, 
+                      by = list(wage_panel$black, wage_panel$post), FUN = mean) %>% 
+  rename(black = Group.1, post = Group.2, ln_salary = x)
+ln_salary
+```
+
+## 4
+### 4a
+```{r}
+first_diff = ln_salary[4,3] - ln_salary[2,3]
+first_diff
+```
+The salary increases for black workers after 1913. The simple difference estimator is not a suitable estimator because it does not isolate the policy effect but also considers other factors such as a general increase in wages for all groups. Consequently, it is not a good approach to estimate the causal effect of the policy intervention.
+
+### 4b
+```{r}
+did = (ln_salary[4,3] - ln_salary[2,3]) - (ln_salary[3,3] - ln_salary[1,3]) 
+did
+```
+
+For both groups the average salary increases, yet for black workers the wages increase was smaller than for white workers, due to the policy. As long as the trends are parallel before 1913 this seems to be a valid estimator.
+
+## 5 
+### 5a
+```{r}
+lm1 <- lm_robust(ln_salary ~ black*post, data = wage_panel)
+summary(lm1)
+```
+### 5b
+For black workers the policy decreases the wage by 7.6% on average, relative to white workers. The effect is significant at the 1% level.
+
+## 6
+### 6a
+Year fixed effects capture factors that affect both black and white workers in a given year. In the setting this could be the effect of world war I on the labor market or the change in industry practices that altered the labor market.
+
+### 6b
+```{r, results='asis'}
+fem1 <- feols(ln_salary ~ black + black:post | year, wage_panel, vcov = "hetero")
+etable(fem1, tex = T)
+```
+
+
+## 7 
+### 7a
+Individual fixed effects capture factors such as ability, motivation, health, and others that could explain why a workers salary deviates from the mean of all workers. In the regressions before where aggregated on the level of black and white workers such that we could only differentiate structural differences between the two groups. With individual fixed effect we cannot only capture structural but also individuals differences (yet we cannot separate the two)
+
+### 7b
+```{r, results='asis'}
+fem2 <- feols(ln_salary ~ black:post | year + id, wage_panel, vcov = "hetero")
+etable(fem2, tex = T)
+```
+
+## 8
+### 8a
+```{r, results='asis'}
+library(estimatr)
+fem3 <- feols(ln_salary ~ i(year, black, ref = 1913) + year | id, wage_panel, vcov = "hetero")
+etable(fem3, tex = TRUE)
+```
+### 8b
+```{r}
+iplot(fem3)
+```
+
+### 8c
+
+The year specific wage effects for black individuals seem to decrease over the years. This decrease seems to take place even before 1913. This could be explained by a general dismay in reaction to more black workers in factories that eventually lead to the discriminatory policy. In the four years after the policy this negative effect seems to be particularly harsh, relative to 1913. Starting in 1917, the "Harlem Renaissance" could have lead to more resistance against the discriminatory policy and the wages could have increased again compared to 1913.
+
+## 9
+```{r, results='asis'}
+etable(fem1, fem2, fem3, tex = TRUE)
+```
+
